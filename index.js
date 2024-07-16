@@ -45,7 +45,7 @@ const client = new MongoClient(uri, {
     strict: true,
     deprecationErrors: true,
   },
-});"hello"
+});
 
 async function run() {
   try {
