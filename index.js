@@ -51,11 +51,22 @@ async function run() {
   try {
     const usersCollection = client.db("paypulseDB").collection("users");
 
+    // auth related api
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "7d",
+      });
+      res.send({ token });
+    });
+
     // New User Registration
     app.post("/register", async (req, res) => {
-      const { name, pin, number, email } = req.body;
+      const formData = req.body;
+      const { name, email, number, pin } = formData;
       try {
         const hashedPin = await bcrypt.hash(pin, 10);
+        console.log(hashedPin);
         const newUser = {
           name,
           pin: hashedPin,
@@ -63,12 +74,44 @@ async function run() {
           email,
           status: "pending",
           balance: 0,
+          role: "user",
         };
         const result = await usersCollection.insertOne(newUser);
         res.send(result);
       } catch (err) {
         res.status(400).send(err.message);
       }
+    });
+
+    // User login
+    app.post("/login", async (req, res) => {
+      const formData = req.body;
+      const { identifier, pin } = formData;
+      try {
+        const user = await usersCollection.findOne({
+          $or: [{ number: identifier }, { email: identifier }],
+        });
+        if (!user) return res.status(400).send("Invalid Credentials");
+
+        const isMatch = await bcrypt.compare(pin, user.pin);
+        if (!isMatch) return res.status(400).send("Invalid Credentials");
+
+        const token = jwt.sign(
+          { email: user.email },
+          process.env.ACCESS_TOKEN_SECRET,
+          {
+            expiresIn: "1h",
+          }
+        );
+        res.json({ token });
+      } catch (error) {
+        res.status(500).send("Server error");
+      }
+    });
+
+    app.get("/login", async (req, res) => {
+      const result = await usersCollection.find().toArray();
+      res.send(result);
     });
 
     console.log(
