@@ -83,6 +83,66 @@ async function run() {
       }
     });
 
+    app.patch("/send", async (req, res) => {
+      const sendData = req.body;
+      const {
+        recipient_number,
+        send_amount,
+        pin: senderPin,
+        userEmail,
+      } = sendData;
+
+      try {
+        const recipient = await usersCollection.findOne({
+          number: recipient_number,
+        });
+
+        if (send_amount < 50) {
+          return res.status(400).send("Amount should be at least 50");
+        }
+
+        if (!recipient) {
+          return res.status(404).send("Recipient not found");
+        }
+
+        const sender = await usersCollection.findOne({
+          email: userEmail,
+        });
+
+        const isMatch = await bcrypt.compare(senderPin, sender.pin);
+        if (!isMatch) return res.status(400).send("Incorrect PIN");
+
+        const senderNewBalance = sender.balance - send_amount;
+        if (senderNewBalance < 0) {
+          return res.status(400).send("Insufficient Balance");
+        }
+
+        const senderQuery = { email: userEmail };
+
+        const newBalance = recipient.balance + send_amount;
+
+        const query = { number: recipient_number };
+
+        const updateResult = {
+          $set: { balance: newBalance },
+        };
+
+        const senderUpdate = {
+          $set: { balance: senderNewBalance },
+        };
+
+        const result = await usersCollection.updateOne(query, updateResult);
+        const sendingResult = await usersCollection.updateOne(
+          senderQuery,
+          senderUpdate
+        );
+        res.send(sendingResult);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send("Server error");
+      }
+    });
+
     // User login
     app.post("/login", async (req, res) => {
       const formData = req.body;
