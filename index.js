@@ -83,7 +83,8 @@ async function run() {
       }
     });
 
-    app.patch("/send", async (req, res) => {
+    // Send Money Operation
+    app.patch("/send", verifyToken, async (req, res) => {
       const sendData = req.body;
       const {
         recipient_number,
@@ -92,14 +93,14 @@ async function run() {
         userEmail,
       } = sendData;
 
+      if (send_amount < 50) {
+        return res.status(400).send("Amount should be at least 50 Taka");
+      }
+
       try {
         const recipient = await usersCollection.findOne({
           number: recipient_number,
         });
-
-        if (send_amount < 50) {
-          return res.status(400).send("Amount should be at least 50");
-        }
 
         if (!recipient) {
           return res.status(404).send("Recipient not found");
@@ -112,7 +113,13 @@ async function run() {
         const isMatch = await bcrypt.compare(senderPin, sender.pin);
         if (!isMatch) return res.status(400).send("Incorrect PIN");
 
-        const senderNewBalance = sender.balance - send_amount;
+        let senderNewBalance;
+        if (send_amount > 99) {
+          senderNewBalance = sender.balance - (send_amount + 5);
+        } else {
+          senderNewBalance = sender.balance - send_amount;
+        }
+
         if (senderNewBalance < 0) {
           return res.status(400).send("Insufficient Balance");
         }
@@ -136,7 +143,7 @@ async function run() {
           senderQuery,
           senderUpdate
         );
-        res.send(sendingResult);
+        // res.send(sendingResult);
         res.send(result);
       } catch (error) {
         res.status(500).send("Server error");
