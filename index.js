@@ -83,7 +83,7 @@ async function run() {
       }
     });
 
-    // Send Money Operation
+    // <------- Send Money Operation -------->
     app.patch("/send", verifyToken, async (req, res) => {
       const sendData = req.body;
       const {
@@ -147,14 +147,13 @@ async function run() {
           senderQuery,
           senderUpdate
         );
-        // res.send(sendingResult);
         res.send(result);
       } catch (error) {
         res.status(500).send("Server error");
       }
     });
 
-    // Cash
+    // <--------- Cash Out --------->
     app.patch("/cashout", verifyToken, async (req, res) => {
       // return console.log("hit");
       const sendData = req.body;
