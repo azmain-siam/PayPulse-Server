@@ -106,6 +106,10 @@ async function run() {
           return res.status(404).send("Recipient not found");
         }
 
+        if (recipient.role !== "user") {
+          return res.send("Not an user");
+        }
+
         const sender = await usersCollection.findOne({
           email: userEmail,
         });
@@ -129,6 +133,73 @@ async function run() {
         const newBalance = recipient.balance + send_amount;
 
         const query = { number: recipient_number };
+
+        const updateResult = {
+          $set: { balance: newBalance },
+        };
+
+        const senderUpdate = {
+          $set: { balance: senderNewBalance },
+        };
+
+        const result = await usersCollection.updateOne(query, updateResult);
+        const sendingResult = await usersCollection.updateOne(
+          senderQuery,
+          senderUpdate
+        );
+        // res.send(sendingResult);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send("Server error");
+      }
+    });
+
+    // Cash
+    app.patch("/cashout", verifyToken, async (req, res) => {
+      // return console.log("hit");
+      const sendData = req.body;
+      const { agent_number, send_amount, pin: senderPin, userEmail } = sendData;
+
+      if (send_amount < 50) {
+        return res.status(400).send("Amount should be at least 50 Taka");
+      }
+
+      try {
+        const agent = await usersCollection.findOne({
+          number: agent_number,
+        });
+
+        if (!agent) {
+          return res.status(404).send("Agent not found");
+        }
+
+        if (agent.role !== "agent") {
+          return res.send("Not an agent.");
+        }
+
+        const sender = await usersCollection.findOne({
+          email: userEmail,
+        });
+
+        const isMatch = await bcrypt.compare(senderPin, sender.pin);
+        if (!isMatch) return res.status(400).send("Incorrect PIN");
+
+        let senderNewBalance;
+        if (send_amount > 99) {
+          senderNewBalance = sender.balance - (send_amount + 5);
+        } else {
+          senderNewBalance = sender.balance - send_amount;
+        }
+
+        if (senderNewBalance < 0) {
+          return res.status(400).send("Insufficient Balance");
+        }
+
+        const senderQuery = { email: userEmail };
+
+        const newBalance = agent.balance + send_amount;
+
+        const query = { number: agent_number };
 
         const updateResult = {
           $set: { balance: newBalance },
