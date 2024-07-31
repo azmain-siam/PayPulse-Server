@@ -50,6 +50,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     const usersCollection = client.db("paypulseDB").collection("users");
+    const requestsCollection = client.db("paypulseDB").collection("requests");
 
     // auth related api
     app.post("/jwt", async (req, res) => {
@@ -214,6 +215,43 @@ async function run() {
           senderUpdate
         );
         // res.send(sendingResult);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send("Server error");
+      }
+    });
+
+    // <--------- Cash In requests --------->
+    app.post("/requests", async (req, res) => {
+      const sendingData = req.body;
+      console.log(sendingData);
+      const { agent_number, send_amount, pin: senderPin, user } = sendingData;
+
+      try {
+        const agent = await usersCollection.findOne({
+          number: agent_number,
+          role: "agent",
+        });
+
+        if (!agent) {
+          res.status(404).send("Agent not found");
+        }
+
+        const sender = await usersCollection.findOne({
+          email: user,
+        });
+
+        const isMatch = await bcrypt.compare(senderPin, sender.pin);
+        if (!isMatch) return res.status(400).send("Incorrect PIN");
+
+        const request = {
+          from: user,
+          amount: send_amount,
+          status: "pending",
+          time: new Date().toISOString(),
+        };
+
+        const result = await requestsCollection.insertOne(request);
         res.send(result);
       } catch (error) {
         res.status(500).send("Server error");
